@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>OSRS Combat Achievements Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /*===== Design tokens, adapted from bedimcode/portfolio-responsive-complete =====*/
+  :root {
+    --hue-color: 224;
+    --first-color: hsl(var(--hue-color), 89%, 60%);
+    --first-color-dark: hsl(var(--hue-color), 75%, 45%);
+    --second-color: hsl(var(--hue-color), 56%, 12%);
+    --body-font: 'Poppins', sans-serif;
+    --text-color: #5b6472;
+    --page-bg: #f5f7fb;
+    --card-bg: #ffffff;
+    --border-light: #e5e9f2;
+    --danger: #c92a2a;
+    --danger-bg: #fdeaea;
+    --tier-easy: #28863a;
+    --tier-medium: #0c8599;
+    --tier-hard: #9c36b5;
+    --tier-elite: #c64c0a;
+    --tier-master: #d6336c;
+    --tier-grandmaster: #c92a2a;
+    --rarity-common: #28863a;
+    --rarity-uncommon: #1971c2;
+    --rarity-rare: #c64c0a;
+    --rarity-veryrare: #c92a2a;
+    --card-shadow: 0px 4px 25px rgba(14, 36, 49, 0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page-bg);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    padding: 16px;
+  }
+  .wrap { max-width: 1024px; margin: 0 auto; }
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    color: var(--second-color);
+    letter-spacing: 0.2px;
+  }
+  h1 .title-accent { color: var(--first-color); }
+  .subtitle {
+    color: var(--text-color);
+    font-size: 13px;
+    margin: 0 0 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .section-title {
+    display: inline-block;
+    position: relative;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--first-color);
+    margin: 0 0 22px;
+    padding-bottom: 12px;
+  }
+  .section-title::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 0;
+    width: 48px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--first-color);
+  }
+  .section-title-wrap { text-align: center; }
+
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--second-color);
+    color: var(--second-color);
+    padding: 10px 14px;
+    border-radius: 0.5rem;
+    font-size: 15px;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  input[type="text"]::placeholder { color: #97a1b0; }
+  input[type="text"]:focus { outline: none; border-color: var(--first-color); }
+  select {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border-light);
+    color: var(--second-color);
+    padding: 6px 10px;
+    border-radius: 0.5rem;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  button {
+    background: var(--first-color);
+    border: none;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 0.5rem;
+    font-family: var(--body-font);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover:not(:disabled) { box-shadow: 0px 10px 24px rgba(58, 109, 240, 0.35); transform: translateY(-1px); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible,
+  .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible {
+    outline: 2px solid var(--first-color);
+    outline-offset: 2px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(58, 109, 240, 0.25);
+    border-top-color: var(--first-color);
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: -1px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #status {
+    padding: 12px 14px;
+    border-radius: 0.5rem;
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    border: 1px solid var(--border-light);
+  }
+  #status.info { background: #eaf2fe; border-color: #cfe0fb; color: var(--second-color); }
+  #status.error { background: var(--danger-bg); border-color: #f3c6c6; color: #8a2323; }
+  #status a { color: var(--first-color-dark); }
+  #status.hidden { display: none; }
+
+  #results.hidden { display: none; }
+
+  .summary, .panel, .tier-card, .task {
+    background: var(--card-bg);
+    border: none;
+    box-shadow: var(--card-shadow);
+    border-radius: 0.5rem;
+  }
+
+  .summary {
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+  }
+  .summary .name { font-size: 20px; font-weight: 700; color: var(--second-color); }
+  .summary .points { color: #8993a4; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+  .badge {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .next-tier-line { flex: 1; min-width: 220px; }
+  .bar-track {
+    background: #e9ecf3;
+    border-radius: 0.5rem;
+    height: 10px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .bar-fill { height: 100%; border-radius: 0.5rem; }
+
+  .tier-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .tier-card {
+    border-left: 5px solid var(--tier-color, var(--first-color));
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .tier-card.active { box-shadow: 0 0 0 2px var(--tier-color, var(--first-color)) inset, var(--card-shadow); }
+  .tier-card .tname { font-weight: 600; font-size: 13px; color: var(--second-color); }
+  .tier-card .tcount { color: #8993a4; font-size: 12px; margin: 4px 0 6px; font-weight: 600; }
+
+  .panel {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel p.hint { color: var(--text-color); font-size: 13px; margin: 0 0 10px; }
+  .rarity-status { font-size: 11px; color: #8993a4; font-weight: 400; }
+
+  .plan-task {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+  }
+  .plan-task:last-child { border-bottom: none; }
+  .plan-task-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .plan-task-pts { color: var(--first-color-dark); font-weight: 700; white-space: nowrap; }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text-color);
+  }
+  .filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .filters input[type="text"] { max-width: 220px; padding: 6px 10px; font-size: 13px; text-overflow: ellipsis; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    border: 1.5px solid var(--border-light);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--body-font);
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-color);
+    background: var(--card-bg);
+  }
+  .chip.on { color: #fff; font-weight: 700; border-color: transparent; }
+
+  .tier-section { margin-bottom: 18px; }
+  .tier-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border-light);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: inherit;
+  }
+  .tier-section .chevron { display: inline-block; font-size: 11px; transition: transform 0.15s ease; }
+  .tier-section.collapsed .chevron { transform: rotate(-90deg); }
+  .tier-section.collapsed .task-list { display: none; }
+  .task-list { display: flex; flex-direction: column; gap: 10px; }
+  .task {
+    padding: 12px 14px;
+  }
+  .task.completed { opacity: 0.6; }
+  .task-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .task-name { font-weight: 600; font-size: 14px; color: var(--second-color); }
+  .task-name.completed-name { text-decoration: line-through; color: #8993a4; }
+  .task-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: var(--page-bg);
+    border: 1px solid var(--border-light);
+    color: var(--text-color);
+    padding: 3px 9px;
+    border-radius: 12px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .rarity-tag { font-weight: 700; }
+  .rarity-common { color: var(--rarity-common); border-color: var(--rarity-common); background: #eaf6ec; }
+  .rarity-uncommon { color: var(--rarity-uncommon); border-color: var(--rarity-uncommon); background: #eaf2fc; }
+  .rarity-rare { color: var(--rarity-rare); border-color: var(--rarity-rare); background: #fcf0e6; }
+  .rarity-veryrare { color: var(--rarity-veryrare); border-color: var(--rarity-veryrare); background: #fbeaea; }
+  .task-desc { color: var(--text-color); font-size: 13px; margin-top: 4px; }
+  .task-monster { color: #8993a4; font-size: 12px; margin-top: 2px; font-style: italic; }
+  .empty-note { color: var(--text-color); font-size: 13px; padding: 8px 0; }
+
+  footer {
+    background: var(--second-color);
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    margin: 24px 0 8px;
+    padding: 20px 16px;
+    border-radius: 0.5rem;
+  }
+  footer a { color: hsl(var(--hue-color), 89%, 75%); font-weight: 600; }
+
+  @media (max-width: 480px) {
+    .summary { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OSRS <span class="title-accent">Combat Achievements</span> Tracker</h1>
+  <p class="subtitle">Look up a player and see exactly which Combat Achievement tasks they have left, tier by tier.</p>
+
+  <div class="search-row">
+    <input type="text" id="username-input" placeholder="Enter RuneScape username" maxlength="12" autocomplete="off">
+    <button id="lookup-btn">Look Up</button>
+  </div>
+
+  <div id="status" class="info hidden"></div>
+
+  <div id="results" class="hidden">
+    <div class="summary" id="summary"></div>
+
+    <div class="tier-grid" id="tier-grid"></div>
+
+    <div class="panel" id="next-tier-panel"></div>
+
+    <div class="panel">
+      <div class="section-title-wrap"><h2 class="section-title">Remaining Tasks <span class="rarity-status" id="rarity-status"></span></h2></div>
+      <div class="filters">
+        <input type="text" id="search-input" placeholder="Search tasks...">
+        <div class="chip-row" id="tier-chips"></div>
+        <label><input type="checkbox" id="hide-exempt" checked> Hide exempt tasks</label>
+        <label><input type="checkbox" id="show-completed"> Show completed too</label>
+        <label>Sort:
+          <select id="sort-select">
+            <option value="tier">Tier order</option>
+            <option value="rarest">Rarest first</option>
+            <option value="common">Most common first</option>
+          </select>
+        </label>
+      </div>
+      <div id="task-container"></div>
+    </div>
+  </div>
+
+  <footer>
+    Data provided by <a href="https://runeprofile.com" target="_blank" rel="noopener">RuneProfile</a>, synced from the player's RuneLite plugin.
+    Reward-tier point thresholds and per-task completion rates are community-sourced from the
+    <a href="https://oldschool.runescape.wiki/w/Combat_Achievements/All_tasks" target="_blank" rel="noopener">OSRS Wiki</a> and may shift over time.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var API_BASE = "https://api.runeprofile.com/v1";
+  var WIKI_API = "https://oldschool.runescape.wiki/api.php";
+  var WIKI_PAGE = "Combat_Achievements/All_tasks";
+  var WIKI_CACHE_KEY = "osrs-ca-completion-rates-v1";
+  var WIKI_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+  // Reward-tier point thresholds and per-task point values, per the OSRS Wiki.
+  // Order matters: ascending difficulty.
+  var TIERS = [
+    { name: "Easy",        points: 1, unlock: 41,   color: "var(--tier-easy)" },
+    { name: "Medium",      points: 2, unlock: 169,  color: "var(--tier-medium)" },
+    { name: "Hard",        points: 3, unlock: 436,  color: "var(--tier-hard)" },
+    { name: "Elite",       points: 4, unlock: 1100, color: "var(--tier-elite)" },
+    { name: "Master",      points: 5, unlock: 1965, color: "var(--tier-master)" },
+    { name: "Grandmaster", points: 6, unlock: 2697, color: "var(--tier-grandmaster)" }
+  ];
+  var TIER_INDEX = {};
+  TIERS.forEach(function (t, i) { TIER_INDEX[t.name] = i; });
+
+  var usernameInput = document.getElementById("username-input");
+  var lookupBtn = document.getElementById("lookup-btn");
+  var statusEl = document.getElementById("status");
+  var resultsEl = document.getElementById("results");
+  var summaryEl = document.getElementById("summary");
+  var tierGridEl = document.getElementById("tier-grid");
+  var nextTierPanel = document.getElementById("next-tier-panel");
+  var searchInput = document.getElementById("search-input");
+  var tierChipsEl = document.getElementById("tier-chips");
+  var hideExemptEl = document.getElementById("hide-exempt");
+  var showCompletedEl = document.getElementById("show-completed");
+  var sortSelectEl = document.getElementById("sort-select");
+  var rarityStatusEl = document.getElementById("rarity-status");
+  var taskContainerEl = document.getElementById("task-container");
+
+  var state = {
+    data: null,
+    activeTiers: new Set(TIERS.map(function (t) { return t.name; })),
+    collapsedTiers: new Set(),
+    sortMode: "tier",
+    completionRates: null
+  };
+
+  function escapeHtml(str) {
+    var div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+
+  function bindActivate(el, handler) {
+    el.addEventListener("click", handler);
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handler();
+      }
+    });
+  }
+
+  function setStatus(message, kind) {
+    if (!message) {
+      statusEl.className = "hidden";
+      statusEl.innerHTML = "";
+      return;
+    }
+    statusEl.className = kind || "info";
+    statusEl.innerHTML = message;
+  }
+
+  function readLastUsername() {
+    try { return localStorage.getItem("osrs-ca-last-username") || ""; }
+    catch (e) { return ""; }
+  }
+  function saveLastUsername(name) {
+    try { localStorage.setItem("osrs-ca-last-username", name); }
+    catch (e) { /* private mode or blocked storage: ignore */ }
+  }
+
+  function loadCachedCompletionRates() {
+    try {
+      var raw = localStorage.getItem(WIKI_CACHE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.map !== "object" || typeof parsed.fetchedAt !== "number") return null;
+      if (Date.now() - parsed.fetchedAt > WIKI_CACHE_TTL_MS) return null;
+      return parsed.map;
+    } catch (e) { return null; }
+  }
+  function saveCachedCompletionRates(map) {
+    try {
+      localStorage.setItem(WIKI_CACHE_KEY, JSON.stringify({ map: map, fetchedAt: Date.now() }));
+    } catch (e) {
+      // Private browsing or blocked storage: caching just won't persist across reloads.
+      console.warn("osrs-ca-tracker: couldn't cache completion rates in localStorage; will re-fetch next load.", e);
+    }
+  }
+
+  function fetchCompletionRates() {
+    var cached = loadCachedCompletionRates();
+    if (cached) return Promise.resolve(cached);
+
+    var url = WIKI_API + "?action=parse&page=" + encodeURIComponent(WIKI_PAGE) + "&format=json&prop=text&origin=*";
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error("wiki_http_" + res.status);
+      return res.json();
+    }).then(function (json) {
+      if (!json || !json.parse || !json.parse.text || typeof json.parse.text["*"] !== "string") {
+        throw new Error("wiki_bad_response");
+      }
+      var html = json.parse.text["*"];
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var rows = doc.querySelectorAll("tr[data-ca-task-id]");
+      var map = {};
+      rows.forEach(function (row) {
+        var id = row.getAttribute("data-ca-task-id");
+        var cells = row.querySelectorAll("td");
+        if (!id || !cells.length) return;
+        var text = cells[cells.length - 1].textContent.trim();
+        var pct = parseFloat(text.replace("%", ""));
+        if (!isNaN(pct) && pct >= 0 && pct <= 100) map[id] = pct;
+      });
+      if (!Object.keys(map).length) throw new Error("wiki_parse_empty");
+      saveCachedCompletionRates(map);
+      return map;
+    });
+  }
+
+  function completionPercent(taskIndex) {
+    var rates = state.completionRates;
+    if (!rates) return null;
+    var v = rates[String(taskIndex)];
+    return (typeof v === "number") ? v : null;
+  }
+  function rarityClass(pct) {
+    if (pct >= 50) return "rarity-common";
+    if (pct >= 20) return "rarity-uncommon";
+    if (pct >= 5) return "rarity-rare";
+    return "rarity-veryrare";
+  }
+  function rarityBadge(taskIndex) {
+    var pct = completionPercent(taskIndex);
+    if (pct == null) return "";
+    return '<span class="tag rarity-tag ' + rarityClass(pct) + '" title="Share of OSRS Wiki-tracked players who have completed this task">' +
+           pct.toFixed(1) + "% of players</span>";
+  }
+
+  // Kick off in the background; badges backfill onto whatever is already rendered once this resolves.
+  fetchCompletionRates().then(function (map) {
+    state.completionRates = map;
+    if (state.data) {
+      renderTaskList();
+      renderNextTierPlan(state.data);
+    }
+  }).catch(function () {
+    state.completionRates = null;
+    rarityStatusEl.textContent = "(community completion rates unavailable right now)";
+  });
+
+  function fetchCombatAchievements(username) {
+    var url = API_BASE + "/accounts/" + encodeURIComponent(username) + "/combat-achievements/tasks";
+    return fetch(url, { headers: { "Accept": "application/json" } }).then(function (res) {
+      if (res.status === 404) {
+        var err = new Error("not_found");
+        err.code = "not_found";
+        throw err;
+      }
+      if (res.status === 429) {
+        var err2 = new Error("rate_limited");
+        err2.code = "rate_limited";
+        throw err2;
+      }
+      if (!res.ok) {
+        var err3 = new Error("http_" + res.status);
+        err3.code = "http_error";
+        err3.status = res.status;
+        throw err3;
+      }
+      return res.json();
+    });
+  }
+
+  function pointsForTier(tierName) {
+    var t = TIERS[TIER_INDEX[tierName]];
+    return t ? t.points : 0;
+  }
+
+  function computeTierStats(tasks) {
+    var stats = {};
+    TIERS.forEach(function (t) {
+      stats[t.name] = { completed: 0, total: 0 };
+    });
+    tasks.forEach(function (task) {
+      var s = stats[task.tierName];
+      if (!s) return; // unknown tier name from API; ignore rather than crash
+      if (task.exempt) return; // exempt tasks don't count toward this account's totals
+      s.total++;
+      if (task.completed) s.completed++;
+    });
+    return stats;
+  }
+
+  function findNextTier(totalPoints) {
+    for (var i = 0; i < TIERS.length; i++) {
+      if (totalPoints < TIERS[i].unlock) return TIERS[i];
+    }
+    return null;
+  }
+
+  function renderSummary(data) {
+    var totalPoints = Number(data.totalPoints) || 0;
+    var next = findNextTier(totalPoints);
+    var currentLabel = data.tierReached || "None";
+
+    var html = "";
+    html += '<div><div class="points">Player</div><div class="name">' + escapeHtml(data.username || usernameInput.value.trim()) + "</div></div>";
+    html += '<div><div class="points">Tier Reached</div><span class="badge" style="background:' + tierColor(currentLabel) + ';color:#fff;">' + escapeHtml(currentLabel) + "</span></div>";
+    html += '<div><div class="points">Total Points</div><div class="name">' + totalPoints.toLocaleString() + "</div></div>";
+
+    if (next) {
+      var have = totalPoints;
+      var need = next.unlock;
+      var pct = Math.max(0, Math.min(100, (have / need) * 100));
+      html += '<div class="next-tier-line"><div class="points">Next: ' + escapeHtml(next.name) + " (" + have.toLocaleString() + " / " + need.toLocaleString() + " pts, " + (need - have).toLocaleString() + ' to go)</div>' +
+              '<div class="bar-track"><div class="bar-fill" style="width:' + pct + "%;background:" + next.color + ';"></div></div></div>';
+    } else {
+      html += '<div class="next-tier-line"><div class="points">Maximum reward tier reached by points. Grandmaster\'s full reward still requires completing every non-exempt task.</div></div>';
+    }
+
+    summaryEl.innerHTML = html;
+  }
+
+  function tierColor(name) {
+    var t = TIERS[TIER_INDEX[name]];
+    return t ? t.color : "var(--gold)";
+  }
+
+  function focusByTier(containerEl, tierName) {
+    if (!tierName) return;
+    var el = containerEl.querySelector('[data-tier="' + tierName + '"]');
+    if (el && typeof el.focus === "function") el.focus();
+  }
+
+  function renderTierGrid(stats) {
+    var html = "";
+    TIERS.forEach(function (t) {
+      var s = stats[t.name];
+      var pct = s.total ? (s.completed / s.total) * 100 : 0;
+      var active = state.activeTiers.has(t.name);
+      html += '<div class="tier-card' + (active ? " active" : "") + '" data-tier="' + t.name + '" role="button" tabindex="0" aria-pressed="' + active + '" ' +
+              'style="--tier-color:' + t.color + '" title="Overall progress for this tier &mdash; not affected by the filters below">' +
+              '<div class="tname">' + t.name + "</div>" +
+              '<div class="tcount">' + s.completed + " / " + s.total + "</div>" +
+              '<div class="bar-track"><div class="bar-fill" style="width:' + pct + "%;background:" + t.color + ';"></div></div>' +
+              "</div>";
+    });
+    tierGridEl.innerHTML = html;
+
+    Array.prototype.forEach.call(tierGridEl.querySelectorAll(".tier-card"), function (card) {
+      bindActivate(card, function () {
+        var tier = card.getAttribute("data-tier");
+        if (state.activeTiers.has(tier)) {
+          state.activeTiers.delete(tier);
+        } else {
+          state.activeTiers.add(tier);
+        }
+        renderTierGrid(computeTierStats(state.data.data));
+        renderTierChips();
+        renderTaskList();
+        focusByTier(tierGridEl, tier);
+      });
+    });
+  }
+
+  function renderTierChips() {
+    var html = "";
+    TIERS.forEach(function (t) {
+      var on = state.activeTiers.has(t.name);
+      html += '<span class="chip' + (on ? " on" : "") + '" data-tier="' + t.name + '" role="button" tabindex="0" aria-pressed="' + on + '" style="' +
+              (on ? "background:" + t.color + ";border-color:" + t.color : "") + '">' + t.name + "</span>";
+    });
+    tierChipsEl.innerHTML = html;
+
+    Array.prototype.forEach.call(tierChipsEl.querySelectorAll(".chip"), function (chip) {
+      bindActivate(chip, function () {
+        var tier = chip.getAttribute("data-tier");
+        if (state.activeTiers.has(tier)) {
+          state.activeTiers.delete(tier);
+        } else {
+          state.activeTiers.add(tier);
+        }
+        renderTierChips();
+        renderTierGrid(computeTierStats(state.data.data));
+        renderTaskList();
+        focusByTier(tierChipsEl, tier);
+      });
+    });
+  }
+
+  function renderNextTierPlan(data) {
+    var totalPoints = Number(data.totalPoints) || 0;
+    var next = findNextTier(totalPoints);
+    if (!next) {
+      nextTierPanel.innerHTML = '<div class="section-title-wrap"><h2 class="section-title">Fastest Path</h2></div><p class="hint">You\'ve already crossed every points-based reward threshold. All that\'s left for Grandmaster\'s full reward is finishing every remaining non-exempt task below.</p>';
+      return;
+    }
+    var gap = next.unlock - totalPoints;
+    var remaining = data.data.filter(function (t) { return !t.completed && !t.exempt; });
+    // Cheapest/easiest tasks first: low-tier tasks are typically far quicker to finish
+    // in-game, even though this means more tasks than a points-optimal pick would need.
+    remaining.sort(function (a, b) {
+      var pa = pointsForTier(a.tierName), pb = pointsForTier(b.tierName);
+      if (pa !== pb) return pa - pb;
+      return a.index - b.index;
+    });
+
+    var chosen = [];
+    var acc = 0;
+    for (var i = 0; i < remaining.length && acc < gap; i++) {
+      chosen.push(remaining[i]);
+      acc += pointsForTier(remaining[i].tierName);
+    }
+
+    var html = '<div class="section-title-wrap"><h2 class="section-title">Fastest Path to ' + escapeHtml(next.name) + "</h2></div>";
+    if (next.name === "Grandmaster") {
+      html += '<p class="hint">Grandmaster is different from the other tiers: reaching ' + next.unlock.toLocaleString() +
+              " points only unlocks the badge &mdash; the full reward still needs every remaining non-exempt task completed, not just the cheapest ones shown here.</p>";
+    }
+    if (acc < gap) {
+      html += '<p class="hint">You need ' + gap.toLocaleString() + " more points, but only " + acc.toLocaleString() + ' points worth of non-exempt tasks remain across your whole list &mdash; ' + escapeHtml(next.name) + " may not be reachable yet with tasks currently available to this account.</p>";
+    } else {
+      html += '<p class="hint">' + gap.toLocaleString() + " points needed &mdash; here are the " + chosen.length + " cheapest remaining tasks that would cover it:</p>";
+    }
+    html += '<div class="plan-tasks">';
+    chosen.forEach(function (t) {
+      html += '<div class="plan-task"><span class="plan-task-name">' + escapeHtml(t.name) + ' <span class="tag">' + escapeHtml(t.tierName) + "</span>" + rarityBadge(t.index) + '</span><span class="plan-task-pts">+' + pointsForTier(t.tierName) + " pt</span></div>";
+    });
+    if (!chosen.length) {
+      html += '<p class="empty-note">Nothing left to recommend.</p>';
+    }
+    html += "</div>";
+    nextTierPanel.innerHTML = html;
+  }
+
+  function renderTaskList() {
+    var data = state.data;
+    if (!data) return;
+
+    var focusedTier = null;
+    var activeEl = document.activeElement;
+    if (activeEl && taskContainerEl.contains(activeEl)) {
+      var focusedSection = activeEl.closest(".tier-section");
+      if (focusedSection) focusedTier = focusedSection.getAttribute("data-tier-section");
+    }
+
+    var query = searchInput.value.trim().toLowerCase();
+    var hideExempt = hideExemptEl.checked;
+    var showCompleted = showCompletedEl.checked;
+
+    var byTier = {};
+    TIERS.forEach(function (t) { byTier[t.name] = []; });
+
+    data.data.forEach(function (task) {
+      if (!state.activeTiers.has(task.tierName)) return;
+      if (hideExempt && task.exempt) return;
+      if (!showCompleted && task.completed) return;
+      if (query) {
+        var haystack = (task.name + " " + task.description + " " + (task.monster || "")).toLowerCase();
+        if (haystack.indexOf(query) === -1) return;
+      }
+      if (byTier[task.tierName]) byTier[task.tierName].push(task);
+    });
+
+    function sortTasks(tasks) {
+      if (state.sortMode === "rarest") {
+        tasks.sort(function (a, b) {
+          var pa = completionPercent(a.index), pb = completionPercent(b.index);
+          pa = (pa == null) ? 101 : pa;
+          pb = (pb == null) ? 101 : pb;
+          if (pa !== pb) return pa - pb;
+          return a.index - b.index;
+        });
+      } else if (state.sortMode === "common") {
+        tasks.sort(function (a, b) {
+          var pa = completionPercent(a.index), pb = completionPercent(b.index);
+          pa = (pa == null) ? -1 : pa;
+          pb = (pb == null) ? -1 : pb;
+          if (pa !== pb) return pb - pa;
+          return a.index - b.index;
+        });
+      } else {
+        tasks.sort(function (a, b) { return a.index - b.index; });
+      }
+    }
+
+    var html = "";
+    var anyTasks = false;
+    TIERS.forEach(function (t) {
+      var tasks = byTier[t.name];
+      if (!state.activeTiers.has(t.name) || !tasks.length) return;
+      anyTasks = true;
+      sortTasks(tasks);
+      var collapsed = state.collapsedTiers.has(t.name);
+      var listId = "task-list-" + t.name.toLowerCase();
+      html += '<div class="tier-section' + (collapsed ? " collapsed" : "") + '" data-tier-section="' + t.name + '">' +
+              '<h3 style="color:' + t.color + ';border-color:' + t.color + '" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '" aria-controls="' + listId + '"><span class="chevron">&#9660;</span>' + t.name + " &mdash; " + tasks.length + " shown</h3>";
+      html += '<div class="task-list" id="' + listId + '">';
+      tasks.forEach(function (task) {
+        html += '<div class="task' + (task.completed ? " completed" : "") + '">' +
+                '<div class="task-top">' +
+                '<span class="task-name' + (task.completed ? " completed-name" : "") + '">' + escapeHtml(task.name) + "</span>" +
+                '<span class="task-tags">' +
+                '<span class="tag">' + escapeHtml(task.type || "") + "</span>" +
+                (task.exempt ? '<span class="tag">Exempt</span>' : "") +
+                (task.completed ? '<span class="tag">Done</span>' : "") +
+                rarityBadge(task.index) +
+                "</span>" +
+                "</div>" +
+                '<div class="task-desc">' + escapeHtml(task.description) + "</div>" +
+                (task.monster ? '<div class="task-monster">' + escapeHtml(task.monster) + "</div>" : "") +
+                "</div>";
+      });
+      html += "</div></div>";
+    });
+
+    if (!anyTasks) {
+      var trulyNoneLeft = !data.data.some(function (t) { return !t.completed && !t.exempt; });
+      html = trulyNoneLeft
+        ? '<p class="empty-note">No non-exempt tasks left &mdash; every reachable Combat Achievement is complete.</p>'
+        : '<p class="empty-note">No tasks match your current filters. Try widening the tier selection, clearing the search box, or checking &ldquo;Show completed too&rdquo;.</p>';
+    }
+    taskContainerEl.innerHTML = html;
+
+    Array.prototype.forEach.call(taskContainerEl.querySelectorAll(".tier-section"), function (section) {
+      var header = section.querySelector("h3");
+      var tierName = section.getAttribute("data-tier-section");
+      bindActivate(header, function () {
+        var nowCollapsed;
+        if (state.collapsedTiers.has(tierName)) {
+          state.collapsedTiers.delete(tierName);
+          nowCollapsed = false;
+        } else {
+          state.collapsedTiers.add(tierName);
+          nowCollapsed = true;
+        }
+        section.classList.toggle("collapsed", nowCollapsed);
+        header.setAttribute("aria-expanded", String(!nowCollapsed));
+      });
+    });
+
+    if (focusedTier) {
+      var restoredSection = taskContainerEl.querySelector('[data-tier-section="' + focusedTier + '"]');
+      var restoredHeader = restoredSection && restoredSection.querySelector("h3");
+      if (restoredHeader) restoredHeader.focus();
+    }
+  }
+
+  function resetFilters() {
+    searchInput.value = "";
+    hideExemptEl.checked = true;
+    showCompletedEl.checked = false;
+    sortSelectEl.value = "tier";
+    state.sortMode = "tier";
+    state.activeTiers = new Set(TIERS.map(function (t) { return t.name; }));
+    state.collapsedTiers = new Set();
+  }
+
+  function renderAll(data) {
+    state.data = data;
+    resetFilters();
+    var stats = computeTierStats(data.data);
+    renderSummary(data);
+    renderTierGrid(stats);
+    renderTierChips();
+    renderNextTierPlan(data);
+    renderTaskList();
+    resultsEl.classList.remove("hidden");
+  }
+
+  function doLookup() {
+    if (lookupBtn.disabled) return; // a lookup is already in flight
+    var username = usernameInput.value.trim();
+    if (!username) {
+      setStatus("Enter a username first.", "error");
+      return;
+    }
+    resultsEl.classList.add("hidden");
+    lookupBtn.disabled = true;
+    setStatus('<span class="spinner"></span>Looking up ' + escapeHtml(username) + "&hellip;", "info");
+
+    fetchCombatAchievements(username).then(function (data) {
+      data.username = username;
+      saveLastUsername(username);
+      setStatus(null);
+      renderAll(data);
+    }).catch(function (err) {
+      if (err.code === "not_found") {
+        setStatus(
+          "Couldn't find <strong>" + escapeHtml(username) + "</strong> on RuneProfile. " +
+          "This tool reads from <a href=\"https://runeprofile.com\" target=\"_blank\" rel=\"noopener\">RuneProfile</a>, which needs the player to sync at least once: " +
+          "install the <strong>RuneProfile</strong> plugin from the RuneLite Plugin Hub, log in, and try again a minute later.",
+          "error"
+        );
+      } else if (err.code === "rate_limited") {
+        setStatus("Rate limited by the RuneProfile API. Wait a minute and try again.", "error");
+      } else {
+        setStatus("Something went wrong looking that up. Check the username and your connection, then try again.", "error");
+      }
+    }).finally(function () {
+      lookupBtn.disabled = false;
+    });
+  }
+
+  lookupBtn.addEventListener("click", doLookup);
+  usernameInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") doLookup();
+  });
+  searchInput.addEventListener("input", function () { renderTaskList(); });
+  hideExemptEl.addEventListener("change", function () { renderTaskList(); });
+  showCompletedEl.addEventListener("change", function () { renderTaskList(); });
+  sortSelectEl.addEventListener("change", function () {
+    state.sortMode = sortSelectEl.value;
+    renderTaskList();
+  });
+
+  var last = readLastUsername();
+  if (last) usernameInput.value = last;
+})();
+</script>
+</body>
+</html>
