@@ -11,7 +11,8 @@ it with any static file server.
 
 - Total Combat Achievement points, current reward tier, and progress to the next tier
 - An Easy → Grandmaster completion breakdown
-- A "Fastest Path" planner: the cheapest remaining tasks that would close the point gap to your next tier
+- A "Fastest Path" planner (collapsible): the cheapest remaining tasks that would close the point gap
+  to your next tier
 - A "Your Plan" section: tick any remaining tasks you're considering and see the points/tier they'd add,
   without actually doing them yet
 - The full remaining-task list, grouped by tier or by boss/encounter, filterable by tier / search /

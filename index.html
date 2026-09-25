@@ -194,6 +194,15 @@
     background: var(--accent);
   }
   .section-title-wrap { text-align: center; }
+  .section-title.collapsible {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-title.collapsible .chevron { font-size: 11px; transition: transform 0.15s ease; }
+  .section-title.collapsible.collapsed .chevron { transform: rotate(-90deg); }
 
   .search-row {
     display: flex;
@@ -239,7 +248,8 @@
   button:hover:not(:disabled) { box-shadow: 0px 10px 24px rgba(58, 109, 240, 0.35); transform: translateY(-1px); }
   button:disabled { opacity: 0.5; cursor: default; }
   button:focus-visible, input:focus-visible, select:focus-visible,
-  .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible, .task-name:focus-visible {
+  .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible, .task-name:focus-visible,
+  .section-title.collapsible:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -568,7 +578,8 @@
     groupMode: "tier",
     completionRates: null,
     plannedTasks: new Set(),
-    expandedTasks: new Set()
+    expandedTasks: new Set(),
+    fastestPathCollapsed: false
   };
 
   function escapeHtml(str) {
@@ -848,11 +859,36 @@
     });
   }
 
+  function collapsibleSectionHeader(title) {
+    var collapsed = state.fastestPathCollapsed;
+    return '<div class="section-title-wrap"><h2 class="section-title collapsible' + (collapsed ? " collapsed" : "") +
+           '" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '" aria-controls="fastest-path-body" id="fastest-path-header">' +
+           '<span class="chevron">&#9660;</span>' + escapeHtml(title) + "</h2></div>";
+  }
+
+  function bindFastestPathToggle() {
+    var header = document.getElementById("fastest-path-header");
+    var body = document.getElementById("fastest-path-body");
+    if (!header || !body) return;
+    bindActivate(header, function () {
+      state.fastestPathCollapsed = !state.fastestPathCollapsed;
+      header.classList.toggle("collapsed", state.fastestPathCollapsed);
+      header.setAttribute("aria-expanded", String(!state.fastestPathCollapsed));
+      body.hidden = state.fastestPathCollapsed;
+    });
+  }
+
   function renderNextTierPlan(data) {
+    var wasFocused = document.activeElement && document.activeElement.id === "fastest-path-header";
     var totalPoints = Number(data.totalPoints) || 0;
     var next = findNextTier(totalPoints);
+    var bodyOpenTag = '<div id="fastest-path-body"' + (state.fastestPathCollapsed ? " hidden" : "") + ">";
+
     if (!next) {
-      nextTierPanel.innerHTML = '<div class="section-title-wrap"><h2 class="section-title">Fastest Path</h2></div><p class="hint">You\'ve already crossed every points-based reward threshold. All that\'s left for Grandmaster\'s full reward is finishing every remaining non-exempt task below.</p>';
+      nextTierPanel.innerHTML = collapsibleSectionHeader("Fastest Path") + bodyOpenTag +
+        '<p class="hint">You\'ve already crossed every points-based reward threshold. All that\'s left for Grandmaster\'s full reward is finishing every remaining non-exempt task below.</p></div>';
+      bindFastestPathToggle();
+      if (wasFocused) { var h0 = document.getElementById("fastest-path-header"); if (h0) h0.focus(); }
       return;
     }
     var gap = next.unlock - totalPoints;
@@ -872,7 +908,7 @@
       acc += pointsForTier(remaining[i].tierName);
     }
 
-    var html = '<div class="section-title-wrap"><h2 class="section-title">Fastest Path to ' + escapeHtml(next.name) + "</h2></div>";
+    var html = collapsibleSectionHeader("Fastest Path to " + next.name) + bodyOpenTag;
     if (next.name === "Grandmaster") {
       html += '<p class="hint">Grandmaster is different from the other tiers: reaching ' + next.unlock.toLocaleString() +
               " points only unlocks the badge &mdash; the full reward still needs every remaining non-exempt task completed, not just the cheapest ones shown here.</p>";
@@ -889,8 +925,10 @@
     if (!chosen.length) {
       html += '<p class="empty-note">Nothing left to recommend.</p>';
     }
-    html += "</div>";
+    html += "</div></div>";
     nextTierPanel.innerHTML = html;
+    bindFastestPathToggle();
+    if (wasFocused) { var h1 = document.getElementById("fastest-path-header"); if (h1) h1.focus(); }
   }
 
   function renderPlanSummary() {
@@ -1191,6 +1229,7 @@
     state.collapsedGroups = new Set();
     state.plannedTasks = new Set();
     state.expandedTasks = new Set();
+    state.fastestPathCollapsed = false;
   }
 
   function renderAll(data) {
