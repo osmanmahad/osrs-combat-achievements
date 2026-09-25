@@ -239,7 +239,7 @@
   button:hover:not(:disabled) { box-shadow: 0px 10px 24px rgba(58, 109, 240, 0.35); transform: translateY(-1px); }
   button:disabled { opacity: 0.5; cursor: default; }
   button:focus-visible, input:focus-visible, select:focus-visible,
-  .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible {
+  .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible, .task-name:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -411,9 +411,20 @@
   }
   .task-name-row { display: flex; align-items: center; gap: 8px; }
   .plan-checkbox { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
-  .task-name { font-weight: 600; font-size: 14px; color: var(--text-strong); }
-  .task-name.plannable { cursor: pointer; }
+  .task-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-strong);
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .task-name .chevron { font-size: 10px; transform: rotate(-90deg); transition: transform 0.15s ease; }
+  .task-name.expanded .chevron { transform: rotate(0deg); }
   .task-name.completed-name { text-decoration: line-through; color: var(--muted); }
+  .task-detail { margin-top: 6px; }
   .task-tags { display: flex; gap: 6px; flex-wrap: wrap; }
   .tag {
     font-size: 10px;
@@ -483,6 +494,12 @@
         <div class="chip-row" id="tier-chips"></div>
         <label><input type="checkbox" id="hide-exempt" checked> Hide exempt tasks</label>
         <label><input type="checkbox" id="show-completed"> Show completed too</label>
+        <label>Group by:
+          <select id="group-select">
+            <option value="tier">Tier</option>
+            <option value="boss">Boss</option>
+          </select>
+        </label>
         <label>Sort:
           <select id="sort-select">
             <option value="tier">Tier order</option>
@@ -538,6 +555,7 @@
   var hideExemptEl = document.getElementById("hide-exempt");
   var showCompletedEl = document.getElementById("show-completed");
   var sortSelectEl = document.getElementById("sort-select");
+  var groupSelectEl = document.getElementById("group-select");
   var rarityStatusEl = document.getElementById("rarity-status");
   var taskContainerEl = document.getElementById("task-container");
   var themeToggleBtn = document.getElementById("theme-toggle");
@@ -545,10 +563,12 @@
   var state = {
     data: null,
     activeTiers: new Set(TIERS.map(function (t) { return t.name; })),
-    collapsedTiers: new Set(),
+    collapsedGroups: new Set(),
     sortMode: "tier",
+    groupMode: "tier",
     completionRates: null,
-    plannedTasks: new Set()
+    plannedTasks: new Set(),
+    expandedTasks: new Set()
   };
 
   function escapeHtml(str) {
@@ -763,7 +783,7 @@
 
   function tierColor(name) {
     var t = TIERS[TIER_INDEX[name]];
-    return t ? t.color : "var(--gold)";
+    return t ? t.color : "var(--muted)";
   }
 
   function focusByTier(containerEl, tierName) {
@@ -953,20 +973,25 @@
     var data = state.data;
     if (!data) return;
 
-    var focusedTier = null;
+    var focusedGroupKey = null;
+    var focusedTaskIndex = null;
+    var focusedWasCheckbox = false;
     var activeEl = document.activeElement;
     if (activeEl && taskContainerEl.contains(activeEl)) {
       var focusedSection = activeEl.closest(".tier-section");
-      if (focusedSection) focusedTier = focusedSection.getAttribute("data-tier-section");
+      if (focusedSection) focusedGroupKey = focusedSection.getAttribute("data-group-key");
+      if (activeEl.hasAttribute("data-task-index") &&
+          (activeEl.classList.contains("task-name") || activeEl.classList.contains("plan-checkbox"))) {
+        focusedTaskIndex = activeEl.getAttribute("data-task-index");
+        focusedWasCheckbox = activeEl.classList.contains("plan-checkbox");
+      }
     }
 
     var query = searchInput.value.trim().toLowerCase();
     var hideExempt = hideExemptEl.checked;
     var showCompleted = showCompletedEl.checked;
 
-    var byTier = {};
-    TIERS.forEach(function (t) { byTier[t.name] = []; });
-
+    var filtered = [];
     data.data.forEach(function (task) {
       if (!state.activeTiers.has(task.tierName)) return;
       if (hideExempt && task.exempt) return;
@@ -975,7 +1000,7 @@
         var haystack = (task.name + " " + task.description + " " + (task.monster || "")).toLowerCase();
         if (haystack.indexOf(query) === -1) return;
       }
-      if (byTier[task.tierName]) byTier[task.tierName].push(task);
+      filtered.push(task);
     });
 
     function sortTasks(tasks) {
@@ -1000,42 +1025,90 @@
       }
     }
 
+    var groups;
+    if (state.groupMode === "boss") {
+      // Object.create(null): task.monster is free-text API data, and a plain {}
+      // would let a monster literally named e.g. "constructor" or "toString"
+      // shadow an inherited Object.prototype member and crash the .push() below.
+      var byBoss = Object.create(null);
+      filtered.forEach(function (task) {
+        var key = task.monster || "Other";
+        if (!byBoss[key]) byBoss[key] = [];
+        byBoss[key].push(task);
+      });
+      var bossNames = Object.keys(byBoss).sort(function (a, b) {
+        if (a === "Other" && b !== "Other") return 1;
+        if (b === "Other" && a !== "Other") return -1;
+        return a.localeCompare(b);
+      });
+      groups = bossNames.map(function (name) {
+        return { key: "boss:" + name, title: name, color: "var(--accent)", tasks: byBoss[name], byBoss: true };
+      });
+    } else {
+      groups = TIERS.filter(function (t) { return state.activeTiers.has(t.name); }).map(function (t) {
+        return {
+          key: "tier:" + t.name,
+          title: t.name,
+          color: t.color,
+          tasks: filtered.filter(function (task) { return task.tierName === t.name; }),
+          byBoss: false
+        };
+      });
+    }
+
     var html = "";
     var anyTasks = false;
-    TIERS.forEach(function (t) {
-      var tasks = byTier[t.name];
-      if (!state.activeTiers.has(t.name) || !tasks.length) return;
+    groups.forEach(function (g, gi) {
+      if (!g.tasks.length) return;
       anyTasks = true;
-      sortTasks(tasks);
-      var collapsed = state.collapsedTiers.has(t.name);
-      var listId = "task-list-" + t.name.toLowerCase();
-      html += '<div class="tier-section' + (collapsed ? " collapsed" : "") + '" data-tier-section="' + t.name + '">' +
-              '<h3 style="color:' + t.color + ';border-color:' + t.color + '" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '" aria-controls="' + listId + '"><span class="chevron">&#9660;</span>' + t.name + " &mdash; " + tasks.length + " shown</h3>";
+      sortTasks(g.tasks);
+      var collapsed = state.collapsedGroups.has(g.key);
+      // Indexed by position, not a slug of g.key: g.key can be arbitrary API text in
+      // boss mode, and two different boss names can slugify to the same string.
+      var listId = "task-list-" + gi;
+      html += '<div class="tier-section' + (collapsed ? " collapsed" : "") + '" data-group-key="' + escapeAttr(g.key) + '">' +
+              '<h3 style="color:' + g.color + ';border-color:' + g.color + '" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '" aria-controls="' + listId + '"><span class="chevron">&#9660;</span>' + escapeHtml(g.title) + " &mdash; " + g.tasks.length + " shown</h3>";
       html += '<div class="task-list" id="' + listId + '">';
-      tasks.forEach(function (task) {
+      g.tasks.forEach(function (task) {
         var plannable = !task.completed && !task.exempt;
         var safeIndex = escapeAttr(task.index);
         var checkboxId = "plan-check-" + safeIndex;
+        var detailId = "task-detail-" + safeIndex;
+        var expanded = state.expandedTasks.has(task.index);
+        var nameToggle = '<span class="task-name' + (task.completed ? " completed-name" : "") + (expanded ? " expanded" : "") +
+          '" role="button" tabindex="0" aria-expanded="' + expanded + '" aria-controls="' + detailId + '" data-task-index="' + safeIndex +
+          '"><span class="chevron">&#9660;</span>' + escapeHtml(task.name) + "</span>";
         var nameHtml = plannable
-          ? '<span class="task-name-row"><input type="checkbox" class="plan-checkbox" id="' + checkboxId + '" data-task-index="' + safeIndex + '"' +
-            (state.plannedTasks.has(task.index) ? " checked" : "") + '><label for="' + checkboxId + '" class="task-name plannable">' + escapeHtml(task.name) + "</label></span>"
-          : '<span class="task-name' + (task.completed ? " completed-name" : "") + '">' + escapeHtml(task.name) + "</span>";
+          ? '<span class="task-name-row"><input type="checkbox" class="plan-checkbox" id="' + checkboxId + '" data-task-index="' + safeIndex +
+            '" aria-label="' + escapeAttr("Add \"" + task.name + "\" to plan") + '"' +
+            (state.plannedTasks.has(task.index) ? " checked" : "") + ">" + nameToggle + "</span>"
+          : nameToggle;
         html += '<div class="task' + (task.completed ? " completed" : "") + '">' +
                 '<div class="task-top">' +
                 nameHtml +
                 '<span class="task-tags">' +
+                (g.byBoss ? '<span class="tag" style="color:' + tierColor(task.tierName) + ";border-color:" + tierColor(task.tierName) +
+                  ";background:color-mix(in srgb, " + tierColor(task.tierName) + " 16%, var(--surface))\">" + escapeHtml(task.tierName) + "</span>" : "") +
                 '<span class="tag">' + escapeHtml(task.type || "") + "</span>" +
                 (task.exempt ? '<span class="tag">Exempt</span>' : "") +
                 (task.completed ? '<span class="tag">Done</span>' : "") +
                 rarityBadge(task.index) +
                 "</span>" +
                 "</div>" +
+                '<div class="task-detail" id="' + detailId + '"' + (expanded ? "" : " hidden") + '>' +
                 '<div class="task-desc">' + escapeHtml(task.description) + "</div>" +
-                (task.monster ? '<div class="task-monster">' + escapeHtml(task.monster) + "</div>" : "") +
+                (!g.byBoss && task.monster ? '<div class="task-monster">' + escapeHtml(task.monster) + "</div>" : "") +
+                "</div>" +
                 "</div>";
       });
       html += "</div></div>";
     });
+
+    if (anyTasks && state.groupMode === "boss") {
+      var visibleBossCount = groups.filter(function (g) { return g.tasks.length; }).length;
+      html = '<p class="hint">' + visibleBossCount + " boss" + (visibleBossCount === 1 ? "" : "es") +
+             " with tasks shown below.</p>" + html;
+    }
 
     if (!anyTasks) {
       var trulyNoneLeft = !data.data.some(function (t) { return !t.completed && !t.exempt; });
@@ -1047,18 +1120,36 @@
 
     Array.prototype.forEach.call(taskContainerEl.querySelectorAll(".tier-section"), function (section) {
       var header = section.querySelector("h3");
-      var tierName = section.getAttribute("data-tier-section");
+      var groupKey = section.getAttribute("data-group-key");
       bindActivate(header, function () {
         var nowCollapsed;
-        if (state.collapsedTiers.has(tierName)) {
-          state.collapsedTiers.delete(tierName);
+        if (state.collapsedGroups.has(groupKey)) {
+          state.collapsedGroups.delete(groupKey);
           nowCollapsed = false;
         } else {
-          state.collapsedTiers.add(tierName);
+          state.collapsedGroups.add(groupKey);
           nowCollapsed = true;
         }
         section.classList.toggle("collapsed", nowCollapsed);
         header.setAttribute("aria-expanded", String(!nowCollapsed));
+      });
+    });
+
+    Array.prototype.forEach.call(taskContainerEl.querySelectorAll(".task-name"), function (nameEl) {
+      bindActivate(nameEl, function () {
+        var idx = Number(nameEl.getAttribute("data-task-index"));
+        var detail = document.getElementById(nameEl.getAttribute("aria-controls"));
+        var nowExpanded;
+        if (state.expandedTasks.has(idx)) {
+          state.expandedTasks.delete(idx);
+          nowExpanded = false;
+        } else {
+          state.expandedTasks.add(idx);
+          nowExpanded = true;
+        }
+        nameEl.classList.toggle("expanded", nowExpanded);
+        nameEl.setAttribute("aria-expanded", String(nowExpanded));
+        if (detail) detail.hidden = !nowExpanded;
       });
     });
 
@@ -1071,8 +1162,18 @@
       });
     });
 
-    if (focusedTier) {
-      var restoredSection = taskContainerEl.querySelector('[data-tier-section="' + focusedTier + '"]');
+    if (focusedTaskIndex != null) {
+      var selector = (focusedWasCheckbox ? ".plan-checkbox" : ".task-name") + "[data-task-index]";
+      var candidates = taskContainerEl.querySelectorAll(selector);
+      for (var ci = 0; ci < candidates.length; ci++) {
+        if (candidates[ci].getAttribute("data-task-index") === focusedTaskIndex) { candidates[ci].focus(); break; }
+      }
+    } else if (focusedGroupKey) {
+      var allSections = taskContainerEl.querySelectorAll(".tier-section");
+      var restoredSection = null;
+      for (var si = 0; si < allSections.length; si++) {
+        if (allSections[si].getAttribute("data-group-key") === focusedGroupKey) { restoredSection = allSections[si]; break; }
+      }
       var restoredHeader = restoredSection && restoredSection.querySelector("h3");
       if (restoredHeader) restoredHeader.focus();
     }
@@ -1084,9 +1185,12 @@
     showCompletedEl.checked = false;
     sortSelectEl.value = "tier";
     state.sortMode = "tier";
+    groupSelectEl.value = "tier";
+    state.groupMode = "tier";
     state.activeTiers = new Set(TIERS.map(function (t) { return t.name; }));
-    state.collapsedTiers = new Set();
+    state.collapsedGroups = new Set();
     state.plannedTasks = new Set();
+    state.expandedTasks = new Set();
   }
 
   function renderAll(data) {
@@ -1145,6 +1249,11 @@
   showCompletedEl.addEventListener("change", function () { renderTaskList(); });
   sortSelectEl.addEventListener("change", function () {
     state.sortMode = sortSelectEl.value;
+    renderTaskList();
+  });
+  groupSelectEl.addEventListener("change", function () {
+    state.groupMode = groupSelectEl.value;
+    state.collapsedGroups = new Set();
     renderTaskList();
   });
 

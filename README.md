@@ -14,8 +14,9 @@ it with any static file server.
 - A "Fastest Path" planner: the cheapest remaining tasks that would close the point gap to your next tier
 - A "Your Plan" section: tick any remaining tasks you're considering and see the points/tier they'd add,
   without actually doing them yet
-- The full remaining-task list, grouped by tier, filterable by tier / search / exempt / completed,
-  sortable by tier order or by rarity
+- The full remaining-task list, grouped by tier or by boss/encounter, filterable by tier / search /
+  exempt / completed, sortable by tier order or by rarity
+- Click a task's name to expand it and see the full description — the list stays compact by default
 - A per-task completion-rate ("rarity") badge — e.g. "1.8% of players" — sourced from the OSRS Wiki
 - Dark mode: follows your system preference by default, with a manual toggle that's remembered
 
