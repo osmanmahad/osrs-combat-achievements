@@ -3,25 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <title>OSRS Combat Achievements Tracker</title>
+<script>
+// Applied synchronously, before CSS paints, to avoid a flash of the wrong theme.
+(function () {
+  try {
+    var stored = localStorage.getItem("osrs-ca-theme");
+    var theme = (stored === "light" || stored === "dark") ? stored :
+      ((window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) { /* private mode or blocked storage: default light styling still applies */ }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /*===== Design tokens, adapted from bedimcode/portfolio-responsive-complete =====*/
+  /* Light palette (default). Dark overrides follow: system preference first, then an
+     explicit [data-theme] always wins over the system, in either direction. */
   :root {
     --hue-color: 224;
-    --first-color: hsl(var(--hue-color), 89%, 60%);
-    --first-color-dark: hsl(var(--hue-color), 75%, 45%);
-    --second-color: hsl(var(--hue-color), 56%, 12%);
+    --accent: hsl(var(--hue-color), 89%, 60%);
+    --accent-strong: hsl(var(--hue-color), 75%, 45%);
+    --on-accent: #ffffff;
+    --text-strong: hsl(var(--hue-color), 56%, 12%);
     --body-font: 'Poppins', sans-serif;
-    --text-color: #5b6472;
-    --page-bg: #f5f7fb;
-    --card-bg: #ffffff;
-    --border-light: #e5e9f2;
+    --text-body: #5b6472;
+    --muted: #8993a4;
+    --placeholder: #97a1b0;
+    --bg: #f5f7fb;
+    --surface: #ffffff;
+    --border: #e5e9f2;
+    --track: #e9ecf3;
+    --shadow: 0px 4px 25px rgba(14, 36, 49, 0.12);
+    --info-bg: #eaf2fe;
+    --info-border: #cfe0fb;
     --danger: #c92a2a;
     --danger-bg: #fdeaea;
+    --danger-border: #f3c6c6;
     --tier-easy: #28863a;
     --tier-medium: #0c8599;
     --tier-hard: #9c36b5;
@@ -32,40 +53,132 @@
     --rarity-uncommon: #1971c2;
     --rarity-rare: #c64c0a;
     --rarity-veryrare: #c92a2a;
-    --card-shadow: 0px 4px 25px rgba(14, 36, 49, 0.12);
+    --rarity-common-bg: #eaf6ec;
+    --rarity-uncommon-bg: #eaf2fc;
+    --rarity-rare-bg: #fcf0e6;
+    --rarity-veryrare-bg: #fbeaea;
+    /* Deliberately fixed across both themes: a signature dark bar, not a theme-dependent surface. */
+    --footer-bg: hsl(var(--hue-color), 56%, 12%);
+    --footer-text: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --accent: hsl(var(--hue-color), 89%, 68%);
+      --accent-strong: hsl(var(--hue-color), 85%, 78%);
+      --on-accent: #141a2b;
+      --text-strong: #eef2fa;
+      --text-body: #aab3c5;
+      --muted: #909cb0;
+      --placeholder: #909cb0;
+      --bg: #0f1420;
+      --surface: #1a2133;
+      --border: #2a3348;
+      --track: #10141f;
+      --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.45);
+      --info-bg: #16233d;
+      --info-border: #28406b;
+      --danger: #ff9b9b;
+      --danger-bg: #2e1517;
+      --danger-border: #5c2626;
+      --tier-easy: #5cb85c;
+      --tier-medium: #5bacdc;
+      --tier-hard: #c18fdf;
+      --tier-elite: #ef9f3d;
+      --tier-master: #e986ab;
+      --tier-grandmaster: #eb8681;
+      --rarity-common: #5cb85c;
+      --rarity-uncommon: #5bacdc;
+      --rarity-rare: #ef9f3d;
+      --rarity-veryrare: #eb8681;
+      --rarity-common-bg: #16301d;
+      --rarity-uncommon-bg: #12233d;
+      --rarity-rare-bg: #3a2210;
+      --rarity-veryrare-bg: #3a1414;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --accent: hsl(var(--hue-color), 89%, 68%);
+    --accent-strong: hsl(var(--hue-color), 85%, 78%);
+    --on-accent: #141a2b;
+    --text-strong: #eef2fa;
+    --text-body: #aab3c5;
+    --muted: #909cb0;
+    --placeholder: #909cb0;
+    --bg: #0f1420;
+    --surface: #1a2133;
+    --border: #2a3348;
+    --track: #10141f;
+    --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.45);
+    --info-bg: #16233d;
+    --info-border: #28406b;
+    --danger: #ff9b9b;
+    --danger-bg: #2e1517;
+    --danger-border: #5c2626;
+    --tier-easy: #5cb85c;
+    --tier-medium: #5bacdc;
+    --tier-hard: #c18fdf;
+    --tier-elite: #ef9f3d;
+    --tier-master: #e986ab;
+    --tier-grandmaster: #eb8681;
+    --rarity-common: #5cb85c;
+    --rarity-uncommon: #5bacdc;
+    --rarity-rare: #ef9f3d;
+    --rarity-veryrare: #eb8681;
+    --rarity-common-bg: #16301d;
+    --rarity-uncommon-bg: #12233d;
+    --rarity-rare-bg: #3a2210;
+    --rarity-veryrare-bg: #3a1414;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
-    background: var(--page-bg);
-    color: var(--text-color);
+    background: var(--bg);
+    color: var(--text-body);
     font-family: var(--body-font);
     padding: 16px;
   }
   .wrap { max-width: 1024px; margin: 0 auto; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   h1 {
     font-size: 26px;
     font-weight: 700;
     margin: 0 0 6px;
-    color: var(--second-color);
+    color: var(--text-strong);
     letter-spacing: 0.2px;
   }
-  h1 .title-accent { color: var(--first-color); }
+  h1 .title-accent { color: var(--accent); }
   .subtitle {
-    color: var(--text-color);
+    color: var(--text-body);
     font-size: 13px;
     margin: 0 0 18px;
     padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border);
   }
+
+  .theme-toggle-btn {
+    background: var(--surface);
+    color: var(--text-strong);
+    border: 1.5px solid var(--border);
+    border-radius: 0.5rem;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .theme-toggle-btn:hover:not(:disabled) { box-shadow: none; transform: none; background: var(--bg); }
 
   .section-title {
     display: inline-block;
     position: relative;
     font-size: 15px;
     font-weight: 600;
-    color: var(--first-color);
+    color: var(--accent);
     margin: 0 0 22px;
     padding-bottom: 12px;
   }
@@ -78,7 +191,7 @@
     width: 48px;
     height: 3px;
     border-radius: 2px;
-    background: var(--first-color);
+    background: var(--accent);
   }
   .section-title-wrap { text-align: center; }
 
@@ -91,30 +204,30 @@
   input[type="text"] {
     flex: 1;
     min-width: 160px;
-    background: var(--card-bg);
-    border: 1.5px solid var(--second-color);
-    color: var(--second-color);
+    background: var(--surface);
+    border: 1.5px solid var(--text-strong);
+    color: var(--text-strong);
     padding: 10px 14px;
     border-radius: 0.5rem;
     font-size: 15px;
     font-family: inherit;
     font-weight: 500;
   }
-  input[type="text"]::placeholder { color: #97a1b0; }
-  input[type="text"]:focus { outline: none; border-color: var(--first-color); }
+  input[type="text"]::placeholder { color: var(--placeholder); }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
   select {
-    background: var(--card-bg);
-    border: 1.5px solid var(--border-light);
-    color: var(--second-color);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text-strong);
     padding: 6px 10px;
     border-radius: 0.5rem;
     font-size: 13px;
     font-family: inherit;
   }
   button {
-    background: var(--first-color);
+    background: var(--accent);
     border: none;
-    color: #fff;
+    color: var(--on-accent);
     padding: 10px 24px;
     border-radius: 0.5rem;
     font-family: var(--body-font);
@@ -127,7 +240,7 @@
   button:disabled { opacity: 0.5; cursor: default; }
   button:focus-visible, input:focus-visible, select:focus-visible,
   .chip:focus-visible, .tier-card:focus-visible, .tier-section h3:focus-visible {
-    outline: 2px solid var(--first-color);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 
@@ -136,7 +249,7 @@
     width: 12px;
     height: 12px;
     border: 2px solid rgba(58, 109, 240, 0.25);
-    border-top-color: var(--first-color);
+    border-top-color: var(--accent);
     border-radius: 50%;
     margin-right: 8px;
     vertical-align: -1px;
@@ -150,19 +263,19 @@
     margin-bottom: 16px;
     font-size: 14px;
     line-height: 1.5;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border);
   }
-  #status.info { background: #eaf2fe; border-color: #cfe0fb; color: var(--second-color); }
-  #status.error { background: var(--danger-bg); border-color: #f3c6c6; color: #8a2323; }
-  #status a { color: var(--first-color-dark); }
+  #status.info { background: var(--info-bg); border-color: var(--info-border); color: var(--text-strong); }
+  #status.error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+  #status a { color: var(--accent-strong); }
   #status.hidden { display: none; }
 
   #results.hidden { display: none; }
 
   .summary, .panel, .tier-card, .task {
-    background: var(--card-bg);
+    background: var(--surface);
     border: none;
-    box-shadow: var(--card-shadow);
+    box-shadow: var(--shadow);
     border-radius: 0.5rem;
   }
 
@@ -174,8 +287,8 @@
     gap: 20px;
     align-items: center;
   }
-  .summary .name { font-size: 20px; font-weight: 700; color: var(--second-color); }
-  .summary .points { color: #8993a4; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+  .summary .name { font-size: 20px; font-weight: 700; color: var(--text-strong); }
+  .summary .points { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
   .badge {
     display: inline-block;
     padding: 5px 14px;
@@ -187,7 +300,7 @@
   }
   .next-tier-line { flex: 1; min-width: 220px; }
   .bar-track {
-    background: #e9ecf3;
+    background: var(--track);
     border-radius: 0.5rem;
     height: 10px;
     overflow: hidden;
@@ -202,20 +315,20 @@
     margin-bottom: 16px;
   }
   .tier-card {
-    border-left: 5px solid var(--tier-color, var(--first-color));
+    border-left: 5px solid var(--tier-color, var(--accent));
     padding: 12px 14px;
     cursor: pointer;
   }
-  .tier-card.active { box-shadow: 0 0 0 2px var(--tier-color, var(--first-color)) inset, var(--card-shadow); }
-  .tier-card .tname { font-weight: 600; font-size: 13px; color: var(--second-color); }
-  .tier-card .tcount { color: #8993a4; font-size: 12px; margin: 4px 0 6px; font-weight: 600; }
+  .tier-card.active { box-shadow: 0 0 0 2px var(--tier-color, var(--accent)) inset, var(--shadow); }
+  .tier-card .tname { font-weight: 600; font-size: 13px; color: var(--text-strong); }
+  .tier-card .tcount { color: var(--muted); font-size: 12px; margin: 4px 0 6px; font-weight: 600; }
 
   .panel {
     padding: 20px;
     margin-bottom: 16px;
   }
-  .panel p.hint { color: var(--text-color); font-size: 13px; margin: 0 0 10px; }
-  .rarity-status { font-size: 11px; color: #8993a4; font-weight: 400; }
+  .panel p.hint { color: var(--text-body); font-size: 13px; margin: 0 0 10px; }
+  .rarity-status { font-size: 11px; color: var(--muted); font-weight: 400; }
 
   .plan-task {
     display: flex;
@@ -223,12 +336,23 @@
     align-items: center;
     gap: 10px;
     padding: 8px 0;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border);
     font-size: 13px;
   }
   .plan-task:last-child { border-bottom: none; }
   .plan-task-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .plan-task-pts { color: var(--first-color-dark); font-weight: 700; white-space: nowrap; }
+  .plan-task-pts { color: var(--accent-strong); font-weight: 700; white-space: nowrap; }
+
+  .plan-projection { display: flex; flex-wrap: wrap; gap: 24px; margin: 4px 0 14px; }
+  .plan-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .secondary-btn {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1.5px solid var(--accent);
+    padding: 8px 20px;
+    font-size: 13px;
+  }
+  .secondary-btn:hover:not(:disabled) { background: var(--info-bg); box-shadow: none; transform: none; }
 
   .filters {
     display: flex;
@@ -237,13 +361,13 @@
     align-items: center;
     margin-bottom: 14px;
     font-size: 13px;
-    color: var(--text-color);
+    color: var(--text-body);
   }
   .filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .filters input[type="text"] { max-width: 220px; padding: 6px 10px; font-size: 13px; text-overflow: ellipsis; }
   .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip {
-    border: 1.5px solid var(--border-light);
+    border: 1.5px solid var(--border);
     border-radius: 20px;
     padding: 4px 14px;
     font-size: 12px;
@@ -251,10 +375,10 @@
     font-family: var(--body-font);
     cursor: pointer;
     user-select: none;
-    color: var(--text-color);
-    background: var(--card-bg);
+    color: var(--text-body);
+    background: var(--surface);
   }
-  .chip.on { color: #fff; font-weight: 700; border-color: transparent; }
+  .chip.on { color: var(--on-accent); font-weight: 700; border-color: transparent; }
 
   .tier-section { margin-bottom: 18px; }
   .tier-section h3 {
@@ -262,7 +386,7 @@
     font-weight: 600;
     margin: 0 0 10px;
     padding-bottom: 8px;
-    border-bottom: 2px solid var(--border-light);
+    border-bottom: 2px solid var(--border);
     cursor: pointer;
     user-select: none;
     display: flex;
@@ -285,33 +409,36 @@
     gap: 8px;
     flex-wrap: wrap;
   }
-  .task-name { font-weight: 600; font-size: 14px; color: var(--second-color); }
-  .task-name.completed-name { text-decoration: line-through; color: #8993a4; }
+  .task-name-row { display: flex; align-items: center; gap: 8px; }
+  .plan-checkbox { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .task-name { font-weight: 600; font-size: 14px; color: var(--text-strong); }
+  .task-name.plannable { cursor: pointer; }
+  .task-name.completed-name { text-decoration: line-through; color: var(--muted); }
   .task-tags { display: flex; gap: 6px; flex-wrap: wrap; }
   .tag {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    background: var(--page-bg);
-    border: 1px solid var(--border-light);
-    color: var(--text-color);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-body);
     padding: 3px 9px;
     border-radius: 12px;
     white-space: nowrap;
     font-weight: 600;
   }
   .rarity-tag { font-weight: 700; }
-  .rarity-common { color: var(--rarity-common); border-color: var(--rarity-common); background: #eaf6ec; }
-  .rarity-uncommon { color: var(--rarity-uncommon); border-color: var(--rarity-uncommon); background: #eaf2fc; }
-  .rarity-rare { color: var(--rarity-rare); border-color: var(--rarity-rare); background: #fcf0e6; }
-  .rarity-veryrare { color: var(--rarity-veryrare); border-color: var(--rarity-veryrare); background: #fbeaea; }
-  .task-desc { color: var(--text-color); font-size: 13px; margin-top: 4px; }
-  .task-monster { color: #8993a4; font-size: 12px; margin-top: 2px; font-style: italic; }
-  .empty-note { color: var(--text-color); font-size: 13px; padding: 8px 0; }
+  .rarity-common { color: var(--rarity-common); border-color: var(--rarity-common); background: var(--rarity-common-bg); }
+  .rarity-uncommon { color: var(--rarity-uncommon); border-color: var(--rarity-uncommon); background: var(--rarity-uncommon-bg); }
+  .rarity-rare { color: var(--rarity-rare); border-color: var(--rarity-rare); background: var(--rarity-rare-bg); }
+  .rarity-veryrare { color: var(--rarity-veryrare); border-color: var(--rarity-veryrare); background: var(--rarity-veryrare-bg); }
+  .task-desc { color: var(--text-body); font-size: 13px; margin-top: 4px; }
+  .task-monster { color: var(--muted); font-size: 12px; margin-top: 2px; font-style: italic; }
+  .empty-note { color: var(--text-body); font-size: 13px; padding: 8px 0; }
 
   footer {
-    background: var(--second-color);
-    color: #fff;
+    background: var(--footer-bg);
+    color: var(--footer-text);
     font-size: 12px;
     text-align: center;
     margin: 24px 0 8px;
@@ -327,7 +454,10 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>OSRS <span class="title-accent">Combat Achievements</span> Tracker</h1>
+  <div class="header-row">
+    <h1>OSRS <span class="title-accent">Combat Achievements</span> Tracker</h1>
+    <button type="button" id="theme-toggle" class="theme-toggle-btn" aria-label="Switch to dark mode" aria-pressed="false" title="Toggle dark mode">&#127769;</button>
+  </div>
   <p class="subtitle">Look up a player and see exactly which Combat Achievement tasks they have left, tier by tier.</p>
 
   <div class="search-row">
@@ -343,6 +473,8 @@
     <div class="tier-grid" id="tier-grid"></div>
 
     <div class="panel" id="next-tier-panel"></div>
+
+    <div class="panel" id="plan-panel"></div>
 
     <div class="panel">
       <div class="section-title-wrap"><h2 class="section-title">Remaining Tasks <span class="rarity-status" id="rarity-status"></span></h2></div>
@@ -400,6 +532,7 @@
   var summaryEl = document.getElementById("summary");
   var tierGridEl = document.getElementById("tier-grid");
   var nextTierPanel = document.getElementById("next-tier-panel");
+  var planPanelEl = document.getElementById("plan-panel");
   var searchInput = document.getElementById("search-input");
   var tierChipsEl = document.getElementById("tier-chips");
   var hideExemptEl = document.getElementById("hide-exempt");
@@ -407,19 +540,34 @@
   var sortSelectEl = document.getElementById("sort-select");
   var rarityStatusEl = document.getElementById("rarity-status");
   var taskContainerEl = document.getElementById("task-container");
+  var themeToggleBtn = document.getElementById("theme-toggle");
 
   var state = {
     data: null,
     activeTiers: new Set(TIERS.map(function (t) { return t.name; })),
     collapsedTiers: new Set(),
     sortMode: "tier",
-    completionRates: null
+    completionRates: null,
+    plannedTasks: new Set()
   };
 
   function escapeHtml(str) {
     var div = document.createElement("div");
     div.textContent = str == null ? "" : String(str);
     return div.innerHTML;
+  }
+
+  // escapeHtml() is text-node-safe only: browsers don't escape '"' or "'" when
+  // round-tripping through textContent/innerHTML, since quotes aren't special in
+  // text content. Anything interpolated into an HTML ATTRIBUTE value must use this
+  // instead, or a literal '"' in the source string can break out of the attribute.
+  function escapeAttr(str) {
+    return (str == null ? "" : String(str))
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   function bindActivate(el, handler) {
@@ -581,6 +729,15 @@
     return null;
   }
 
+  function reachedTierForPoints(totalPoints) {
+    var reached = null;
+    for (var i = 0; i < TIERS.length; i++) {
+      if (totalPoints >= TIERS[i].unlock) reached = TIERS[i];
+      else break;
+    }
+    return reached;
+  }
+
   function renderSummary(data) {
     var totalPoints = Number(data.totalPoints) || 0;
     var next = findNextTier(totalPoints);
@@ -588,7 +745,7 @@
 
     var html = "";
     html += '<div><div class="points">Player</div><div class="name">' + escapeHtml(data.username || usernameInput.value.trim()) + "</div></div>";
-    html += '<div><div class="points">Tier Reached</div><span class="badge" style="background:' + tierColor(currentLabel) + ';color:#fff;">' + escapeHtml(currentLabel) + "</span></div>";
+    html += '<div><div class="points">Tier Reached</div><span class="badge" style="background:' + tierColor(currentLabel) + ';color:var(--on-accent);">' + escapeHtml(currentLabel) + "</span></div>";
     html += '<div><div class="points">Total Points</div><div class="name">' + totalPoints.toLocaleString() + "</div></div>";
 
     if (next) {
@@ -716,6 +873,82 @@
     nextTierPanel.innerHTML = html;
   }
 
+  function renderPlanSummary() {
+    var data = state.data;
+    if (!data) { planPanelEl.innerHTML = ""; return; }
+
+    var planned = data.data.filter(function (t) { return state.plannedTasks.has(t.index); });
+    var html = '<div class="section-title-wrap"><h2 class="section-title" id="plan-panel-title" tabindex="-1">Your Plan</h2></div>';
+
+    if (!planned.length) {
+      var anyPlannable = data.data.some(function (t) { return !t.completed && !t.exempt; });
+      html += anyPlannable
+        ? '<p class="hint">Tick tasks below in Remaining Tasks to see the points and tier they\'d add, without actually doing them yet.</p>'
+        : '<p class="hint">Nothing left to plan &mdash; every non-exempt task is already complete.</p>';
+      planPanelEl.innerHTML = html;
+      return;
+    }
+
+    var addedPoints = planned.reduce(function (sum, t) { return sum + pointsForTier(t.tierName); }, 0);
+    var currentPoints = Number(data.totalPoints) || 0;
+    var projectedPoints = currentPoints + addedPoints;
+    var currentTier = reachedTierForPoints(currentPoints);
+    var projectedTier = reachedTierForPoints(projectedPoints);
+    var nextTier = findNextTier(projectedPoints);
+    var crossedNewTier = projectedTier && (!currentTier || TIER_INDEX[projectedTier.name] > TIER_INDEX[currentTier.name]);
+
+    html += '<p class="hint">' + planned.length + " task" + (planned.length === 1 ? "" : "s") +
+            " selected, worth <strong>+" + addedPoints.toLocaleString() + " pt" + (addedPoints === 1 ? "" : "s") + "</strong>.</p>";
+
+    html += '<div class="plan-projection">';
+    html += '<div><div class="points">Projected Total</div><div class="name">' + projectedPoints.toLocaleString() + "</div></div>";
+    html += '<div><div class="points">Projected Tier</div><span class="badge" style="background:' +
+            (projectedTier ? tierColor(projectedTier.name) : "var(--muted)") + ';color:var(--on-accent);">' +
+            (projectedTier ? escapeHtml(projectedTier.name) : "None") + "</span></div>";
+    html += "</div>";
+
+    if (crossedNewTier) {
+      var crossedNames = [];
+      for (var ti = (currentTier ? TIER_INDEX[currentTier.name] + 1 : 0); ti <= TIER_INDEX[projectedTier.name]; ti++) {
+        crossedNames.push(TIERS[ti].name);
+      }
+      var crossedLabel = crossedNames.length > 1
+        ? crossedNames.slice(0, -1).join(", ") + " and " + crossedNames[crossedNames.length - 1]
+        : crossedNames[0];
+      html += '<p class="hint">This plan would unlock <strong>' + escapeHtml(crossedLabel) + "</strong>" +
+              (currentTier ? " (up from " + escapeHtml(currentTier.name) + ")" : "") + ".</p>";
+    } else if (nextTier) {
+      var gap = nextTier.unlock - projectedPoints;
+      html += '<p class="hint">Still ' + gap.toLocaleString() + " points short of " + escapeHtml(nextTier.name) + ".</p>";
+    } else {
+      html += '<p class="hint">You\'re already at the maximum reward tier by points &mdash; this plan doesn\'t change that.</p>';
+    }
+    if (projectedTier && projectedTier.name === "Grandmaster") {
+      html += '<p class="hint">Remember: Grandmaster\'s full reward still needs every remaining non-exempt task done, not just enough points.</p>';
+    }
+
+    html += '<div class="plan-chip-row">';
+    planned.forEach(function (t) {
+      html += '<span class="tag">' + escapeHtml(t.name) + "</span>";
+    });
+    html += "</div>";
+
+    html += '<button type="button" id="clear-plan-btn" class="secondary-btn">Clear Plan</button>';
+
+    planPanelEl.innerHTML = html;
+
+    var clearBtn = document.getElementById("clear-plan-btn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        state.plannedTasks.clear();
+        renderPlanSummary();
+        renderTaskList();
+        var title = document.getElementById("plan-panel-title");
+        if (title) title.focus();
+      });
+    }
+  }
+
   function renderTaskList() {
     var data = state.data;
     if (!data) return;
@@ -780,9 +1013,16 @@
               '<h3 style="color:' + t.color + ';border-color:' + t.color + '" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '" aria-controls="' + listId + '"><span class="chevron">&#9660;</span>' + t.name + " &mdash; " + tasks.length + " shown</h3>";
       html += '<div class="task-list" id="' + listId + '">';
       tasks.forEach(function (task) {
+        var plannable = !task.completed && !task.exempt;
+        var safeIndex = escapeAttr(task.index);
+        var checkboxId = "plan-check-" + safeIndex;
+        var nameHtml = plannable
+          ? '<span class="task-name-row"><input type="checkbox" class="plan-checkbox" id="' + checkboxId + '" data-task-index="' + safeIndex + '"' +
+            (state.plannedTasks.has(task.index) ? " checked" : "") + '><label for="' + checkboxId + '" class="task-name plannable">' + escapeHtml(task.name) + "</label></span>"
+          : '<span class="task-name' + (task.completed ? " completed-name" : "") + '">' + escapeHtml(task.name) + "</span>";
         html += '<div class="task' + (task.completed ? " completed" : "") + '">' +
                 '<div class="task-top">' +
-                '<span class="task-name' + (task.completed ? " completed-name" : "") + '">' + escapeHtml(task.name) + "</span>" +
+                nameHtml +
                 '<span class="task-tags">' +
                 '<span class="tag">' + escapeHtml(task.type || "") + "</span>" +
                 (task.exempt ? '<span class="tag">Exempt</span>' : "") +
@@ -822,6 +1062,15 @@
       });
     });
 
+    Array.prototype.forEach.call(taskContainerEl.querySelectorAll(".plan-checkbox"), function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        var idx = Number(checkbox.getAttribute("data-task-index"));
+        if (checkbox.checked) state.plannedTasks.add(idx);
+        else state.plannedTasks.delete(idx);
+        renderPlanSummary();
+      });
+    });
+
     if (focusedTier) {
       var restoredSection = taskContainerEl.querySelector('[data-tier-section="' + focusedTier + '"]');
       var restoredHeader = restoredSection && restoredSection.querySelector("h3");
@@ -837,6 +1086,7 @@
     state.sortMode = "tier";
     state.activeTiers = new Set(TIERS.map(function (t) { return t.name; }));
     state.collapsedTiers = new Set();
+    state.plannedTasks = new Set();
   }
 
   function renderAll(data) {
@@ -847,6 +1097,7 @@
     renderTierGrid(stats);
     renderTierChips();
     renderNextTierPlan(data);
+    renderPlanSummary();
     renderTaskList();
     resultsEl.classList.remove("hidden");
   }
@@ -895,6 +1146,28 @@
   sortSelectEl.addEventListener("change", function () {
     state.sortMode = sortSelectEl.value;
     renderTaskList();
+  });
+
+  function storeTheme(theme) {
+    try { localStorage.setItem("osrs-ca-theme", theme); }
+    catch (e) { /* private mode or blocked storage: choice just won't persist across reloads */ }
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    themeToggleBtn.textContent = theme === "dark" ? "☀️" : "🌙";
+    themeToggleBtn.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+    themeToggleBtn.setAttribute("aria-pressed", String(theme === "dark"));
+  }
+
+  // The <head> script already set data-theme synchronously (avoiding a flash of the
+  // wrong theme); this just syncs the toggle button's icon/label to match on load.
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+
+  themeToggleBtn.addEventListener("click", function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    storeTheme(next);
+    applyTheme(next);
   });
 
   var last = readLastUsername();
